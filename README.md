@@ -98,3 +98,19 @@
 * **RESTful API:** Giao tiếp qua HTTP methods (GET, POST...). Xử lý lỗi bằng Coroutine `try/catch`.
 * **Flutter (BLoC):** BLoC tách UI và Logic qua luồng Event (vào) và State (ra). Rất giống MVVM + StateFlow.
 * **Git:** Phân biệt `merge` (tạo commit gộp) và `rebase` (đắp commit lên đầu nhánh, lịch sử thẳng tắp).
+
+### . Vòng đời của StateFlow thực chất ăn theo cái gì?
+**Câu trả lời chuẩn 10 điểm:** StateFlow phụ thuộc hoàn toàn vào **`CoroutineScope`** mà nó được khởi tạo hoặc được collect (thu thập). Cụ thể chia làm 3 trường hợp:
+
+* **Trường hợp 1: Sống theo Đạo diễn (ViewModel)**
+    * Nếu bạn tạo StateFlow trong ViewModel (dùng `viewModelScope`), nó sẽ sống dai như ViewModel. Xoay màn hình nó không chết. Nó chỉ bị hủy khi ViewModel gọi hàm `onCleared()` (tức là khi thoát hẳn màn hình đó).
+
+* **Trường hợp 2: Sống theo Sân khấu (UI / Jetpack Compose)**
+    * Khi bạn mang cái StateFlow đó ra ngoài giao diện để hiển thị (bằng hàm `collectAsStateWithLifecycle()`), thì quá trình "lắng nghe" (collect) lại ăn theo vòng đời của View (Activity/Fragment).
+    * Sân khấu kéo rèm (`onStop`) -> Dừng collect để tiết kiệm pin. Sân khấu sáng đèn lại (`onStart`) -> Tiếp tục collect.
+
+* **Trường hợp 3: Sống theo Nhà hát (Toàn bộ App)**
+    * Nếu bạn để StateFlow ở một class Singleton (như `UserRepository` hay `BluetoothManager` trong app Petstory) và chạy nó bằng một Scope toàn cục (như `GlobalScope` hoặc scope tự tạo ở tầng Application), thì nó sẽ sống bằng đúng tuổi thọ của ứng dụng. Bấm nút Back thoát app ra ngoài thì nó mới chết.
+
+**💡 Từ khóa ghi điểm (Senior Tip):**
+"Dạ, khi em biến một Flow bình thường thành StateFlow bằng hàm `.stateIn()`, hàm này bắt buộc em phải truyền vào một cái `scope`. Em truyền `viewModelScope` vào đó, nên StateFlow của em sẽ ăn theo vòng đời của ViewModel ạ. Ngoài ra em hay dùng thuộc tính `SharingStarted.WhileSubscribed(5000)` để quy định rằng: Nếu người dùng ẩn app đi quá 5 giây (không còn ai collect), StateFlow sẽ tự động ngủ để tiết kiệm RAM."
