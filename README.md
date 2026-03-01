@@ -99,6 +99,13 @@
 * **Flutter (BLoC):** BLoC tách UI và Logic qua luồng Event (vào) và State (ra). Rất giống MVVM + StateFlow.
 * **Git:** Phân biệt `merge` (tạo commit gộp) và `rebase` (đắp commit lên đầu nhánh, lịch sử thẳng tắp).
 
+### 10. Firebase Cloud Messaging (FCM) & Database
+* **Device Token bị đổi khi nào?** FCM Token không có hạn sử dụng thời gian. Nó thay đổi khi: Clear Data app, Uninstall/Reinstall, cài sang máy mới. Để server luôn cập nhật: Bắt sự kiện ở hàm `onNewToken()` trong `FirebaseMessagingService` và gọi API gửi lên backend.
+* **Xử lý Thông báo khi App bị "Killed":**
+    * Khi app ở Foreground: Bắt thông báo và data trong hàm `onMessageReceived()` của Service.
+    * Khi app bị Background/Killed: Hệ điều hành tự hiển thị thông báo. Hàm `onMessageReceived()` KHÔNG chạy. Khi user bấm vào thông báo, data payload sẽ được nhét vào `Intent` để mở `MainActivity`. Ta phải lấy data ra ở `onCreate()` bằng lệnh `intent.extras`.
+* **Khả năng Offline của Firebase:** Firebase tự động cache data xuống ổ cứng điện thoại. Khi gọi lệnh lưu data lúc mất mạng, UI vẫn phản hồi thành công ngay. Firebase tự đưa lệnh đó vào hàng đợi và sẽ tự động đồng bộ (sync) lên Server ngay khi có mạng trở lại.
+
 ### . Vòng đời của StateFlow thực chất ăn theo cái gì?
 **Câu trả lời chuẩn 10 điểm:** StateFlow phụ thuộc hoàn toàn vào **`CoroutineScope`** mà nó được khởi tạo hoặc được collect (thu thập). Cụ thể chia làm 3 trường hợp:
 
