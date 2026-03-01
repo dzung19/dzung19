@@ -1,0 +1,73 @@
+# BỘ CÂU HỎI PHỎNG VẤN ANDROID (CLEAN ARCHITECTURE, COMPOSE, COROUTINES)
+
+## PHẦN 1: KIẾN TRÚC & DI (Architecture & Dependency Injection)
+
+**1. Khuyết điểm của MVC là gì? Tại sao nên dùng MVVM?**
+* **Đáp án:** MVC hay tạo ra "God Activity" ôm đồm quá nhiều logic. Khi xoay màn hình, Activity chết -> dễ bị crash (NullPointer) nếu đang gọi mạng. MVVM tách logic ra `ViewModel` sống độc lập với vòng đời Activity, giúp xoay màn hình không bị mất data và không bị crash.
+
+**2. Bẫy Memory Leak nguy hiểm nhất trong ViewModel là gì?**
+* **Đáp án:** Truyền `Activity Context` vào ViewModel. ViewModel sống lâu hơn Activity, nên khi Activity bị hủy, ViewModel vẫn "giữ" nó lại khiến hệ thống không thể giải phóng RAM. Nêu cần, chỉ được dùng `ApplicationContext`.
+
+**3. Tại sao phải dùng Repository Pattern trong Clean Architecture?**
+* **Đáp án:** Để tách biệt nguồn dữ liệu (API hay Room DB) khỏi ViewModel. Giúp dễ dàng bảo trì (khi đổi API) và có thể làm giả (Mock) data để viết Unit Test cho ViewModel mà không cần cắm mạng.
+
+**4. Khác biệt cốt lõi giữa MVVM và MVI là gì?**
+* **Đáp án:** MVVM có thể có nhiều StateFlow rải rác. MVI dùng **Luồng dữ liệu đơn hướng (Unidirectional Data Flow)**, gom tất cả UI vào 1 cục `ViewState` duy nhất và nhận các `Intent` (hành động của user) để xử lý. MVI dễ dự đoán lỗi hơn nhưng code dài dòng hơn (Boilerplate).
+
+**5. Hilt sinh ra để giải quyết vấn đề gì của Dagger?**
+* **Đáp án:** Dagger quá khó setup, phải tự viết Component và tự tiêm vào vòng đời rườm rà. Hilt là một "lớp vỏ" bọc ngoài Dagger, tự động hóa mọi thứ chỉ bằng các annotation (như `@AndroidEntryPoint`, `@HiltViewModel`).
+
+---
+
+## PHẦN 2: BẤT ĐỒNG BỘ (Coroutines & Flow)
+
+**6. Flow (Cold) khác gì StateFlow (Hot)?**
+* **Đáp án:** * **Flow (Lạnh - Máy pha cafe):** Chỉ chạy khi có lệnh `collect`. Ai gọi thì chạy lại từ đầu (Rất tốn tài nguyên nếu gọi mạng). Không nhớ giá trị cũ.
+    * **StateFlow (Nóng - Bảng tỷ số):** Luôn giữ 1 giá trị mới nhất, bắt buộc có giá trị ban đầu. Ai vào xem (`collect`) đều thấy ngay data mới nhất, không gọi lại API từ đầu.
+
+**7. Khi nào dùng StateFlow, khi nào dùng SharedFlow?**
+* **Đáp án:** * **StateFlow:** Chứa dữ liệu UI (Danh sách, trạng thái loading).
+    * **SharedFlow:** Bắn sự kiện 1 lần (Toast, chuyển màn hình). Không lưu giá trị cũ, tránh lỗi xoay màn hình bị hiện Toast 2 lần.
+
+**8. Hàm `withContext` hoạt động như thế nào?**
+* **Đáp án:** Là một "bộ đàm" giúp chuyển đổi luồng (Ví dụ từ `Main` sang `IO` để gọi API) mà không làm chặn UI (Non-blocking), không cần dùng callback. Chạy xong nó tự trả kết quả về đúng luồng ban đầu.
+
+**9. Cách tối ưu tính năng Tìm kiếm (Search) bằng Flow?**
+* **Đáp án:** Dùng toán tử `debounce(300ms)` để chờ user gõ xong mới gọi API (chống spam server). Dùng `flatMapLatest` để hủy request cũ, chỉ lấy request mới nhất (chống lỗi Race Condition do mạng lag).
+
+---
+
+## PHẦN 3: JETPACK COMPOSE & UI
+
+**10. Hứng StateFlow trong Compose sao cho tối ưu pin nhất?**
+* **Đáp án:** Dùng hàm `collectAsStateWithLifecycle()`. Nó tự động ngừng thu thập data khi app rơi vào Background (ẩn xuống) và tiếp tục khi app mở lên, không cần tự check vòng đời.
+
+**11. Truyền một Object phức tạp (như Pet Data) qua Navigation Compose thế nào?**
+* **Đáp án:** Tuyệt đối không truyền cả Object. Chỉ truyền `pet_id` (String/Int). Màn hình đích sẽ lấy `pet_id` đó gọi ViewModel -> Repository để query data từ Room/API.
+
+**12. (Câu hỏi mới) Làm sao để tối ưu hiệu năng (tránh Recomposition thừa) trong Compose?**
+* **Đáp án:** * Dùng hàm `remember` để lưu lại các phép tính nặng.
+    * Với danh sách `LazyColumn`, luôn cung cấp `key` cho từng item để Compose biết chính xác item nào thay đổi mà cập nhật cục bộ.
+    * Dùng các List bất biến (`ImmutableList`) thay vì List thường để Compose hiểu là cấu trúc dữ liệu không bị thay đổi ngầm.
+
+---
+
+## PHẦN 4: LOCAL STORAGE & HARDWARE (Android Core)
+
+**13. SharedPreferences: Phân biệt `apply()` và `commit()`?**
+* **Đáp án:** `apply()` lưu bất đồng bộ (chạy ngầm), không chặn UI. `commit()` lưu đồng bộ (bắt hệ thống chờ lưu xong xuống ổ cứng mới chạy tiếp). Luôn dùng `apply()` để tránh giật lag, trừ khi có logic cực kỳ khắt khe bắt buộc phải đợi.
+
+**14. Làm sao để giữ kết nối BLE khi app xuống Background (Android 14+)?**
+* **Đáp án:** Bắt buộc dùng **Foreground Service** đi kèm 1 Notification hiển thị liên tục. Với Android 14+, phải khai báo rõ `foregroundServiceType="connectedDevice"` trong file Manifest.
+
+---
+
+## PHẦN 5: DEBUGGING & LỖI HỆ THỐNG
+
+**15. Bắt thông báo FCM khi app đang bị "Killed" (Vuốt tắt hoàn toàn)?**
+* **Đáp án:** Lúc này hàm `onMessageReceived` không chạy. Hệ điều hành tự hiện thông báo. Khi user bấm vào, data sẽ được nhét vào `Intent` mở `MainActivity`. Ta phải vào hàm `onCreate` để lấy `intent.extras` ra.
+
+**16. (Câu hỏi mới) ANR là gì? Bạn xử lý ANR như thế nào?**
+* **Đáp án:** ANR (App Not Responding) xảy ra khi luồng chính (Main Thread) bị chặn quá 5 giây. 
+    * **Cách Debug:** Đọc log trên Firebase Crashlytics hoặc xuất file `traces.txt` từ thiết bị để xem đoạn code nào đang "chiếm" Main Thread. 
+    * **Cách Fix:** Đẩy các tác vụ nặng (đọc DB, tính toán, xử lý ảnh) sang luồng nền bằng Coroutines `withContext(Dispatchers.IO)` hoặc `Dispatchers.Default`.
