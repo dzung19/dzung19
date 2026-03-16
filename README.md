@@ -53,6 +53,82 @@
     * **Bản chất:** Là một `suspend function` (hàm tạm ngưng). Nó giúp ta **chuyển đổi luồng (switch context)** ngay giữa chừng mà không cần dùng callback lồng nhau (Callback Hell).
     * Nó tạm ngưng coroutine hiện tại, vứt cục code bên trong sang một luồng khác chạy, chạy xong thì trả kết quả về đúng cái luồng ban đầu.
     * **Câu trả lời thực chiến (Ăn điểm tối đa):** *"Trong project Petstory của em, khi gọi API hoặc query Room DB ở tầng Data/Repository, em luôn bọc nó trong `withContext(Dispatchers.IO)` để ép nó chạy ở luồng nền. Nhờ vậy, khi kết quả trả về tầng ViewModel (đang chạy ở `viewModelScope` thuộc Main Thread), em có thể lấy data đó gán thẳng vào StateFlow để cập nhật UI ngay lập tức mà không bao giờ sợ ứng dụng bị crash do lỗi 'Chạm vào UI từ luồng nền'."*
+* **Khác:
+1. Các khái niệm cốt lõi (Core Concepts)
+1.1. Coroutine là gì?
+ * Là các "luồng siêu nhẹ" (lightweight threads). Khác với Thread truyền thống của OS (tiêu tốn nhiều RAM và thời gian khởi tạo), bạn có thể chạy hàng trăm ngàn Coroutines cùng lúc mà không lo sập ứng dụng (OOM).
+ * Bản chất: Coroutine không thay thế Thread, nó chạy trên Thread. Một Thread có thể chạy nhiều Coroutine. Khi một Coroutine bị suspend (tạm dừng), Thread bên dưới nó sẽ được giải phóng để đi chạy Coroutine khác.
+1.2. Hàm suspend
+ * Từ khóa suspend đánh dấu một hàm có khả năng tạm dừng (pause) và tiếp tục (resume) sau đó.
+ * Quy tắc vàng: Hàm suspend chỉ có thể được gọi từ bên trong một Coroutine hoặc từ một hàm suspend khác.
+1.3. Dispatchers (Bộ điều phối)
+Quyết định Coroutine sẽ chạy trên Thread Pool nào:
+ * Dispatchers.Main: Luồng UI (Main Thread). Dùng để cập nhật giao diện, gọi LiveData/StateFlow.
+ * Dispatchers.IO: Luồng tối ưu cho Network, Database, Đọc/Ghi file.
+ * Dispatchers.Default: Luồng tối ưu cho các tác vụ tính toán nặng ngốn CPU (Parse JSON khổng lồ, xử lý ảnh/bitmap, mã hóa dữ liệu).
+ * Dispatchers.Unconfined: Bắt đầu ở luồng hiện tại, nhưng sau khi resume từ một suspend point, nó có thể chạy ở bất kỳ luồng nào. (Ít dùng trong thực tế).
+2. Coroutine Builders & Scopes (Khởi tạo & Vòng đời)
+2.1. Builders: launch vs async
+ * launch: "Bắn và quên" (Fire-and-forget). Dùng khi không cần trả về kết quả. Trả về một Job (dùng để quản lý vòng đời, cancel). Lỗi xảy ra trong launch sẽ ném thẳng ra ngoài (gây crash nếu không catch).
+ * async: Dùng khi cần trả về một kết quả. Trả về một Deferred<T>. Lỗi xảy ra trong async được gói lại bên trong Deferred và chỉ nổ khi gọi hàm .await().
+2.2. Coroutine Scope (Phạm vi hoạt động)
+Scope giúp quản lý vòng đời của Coroutine, tránh rò rỉ bộ nhớ (Memory Leak) khi người dùng thoát màn hình.
+ * GlobalScope: Sống theo vòng đời của toàn bộ App. (Anti-pattern, hạn chế dùng).
+ * viewModelScope: Sống theo ViewModel. Tự động hủy các Coroutines khi ViewModel bị cleared.
+ * lifecycleScope: Sống theo Activity/Fragment.
+ * Custom Scope: Tự định nghĩa cho các class chạy ngầm (ví dụ: Repositories, Managers).
+   val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+3. Đồng thời (Concurrency) với async/await
+Bài toán: Cần gọi 2 API độc lập (A mất 2s, B mất 2s).
+ * Chạy tuần tự (Sequential): Tổng mất 4s.
+ * Chạy đồng thời (Concurrent): Dùng async, tổng chỉ mất 2s.
+suspend fun fetchDashboardData() = coroutineScope {
+    // Bắn 2 request đi cùng lúc trên luồng nền
+    val deferredA = async(Dispatchers.IO) { api.getDataA() }
+    val deferredB = async(Dispatchers.IO) { api.getDataB() }
+
+    // Đợi kết quả
+    val resultA = deferredA.await()
+    val resultB = deferredB.await()
+    
+    return DashboardData(resultA, resultB)
+}
+
+4. Quản lý lỗi (Exception Handling) & Structured Concurrency
+Đây là phần quan trọng nhất để phân loại ứng viên Senior. Nguyên tắc chung: Lỗi của một Coroutine con sẽ lan truyền lên scope cha và hủy bỏ toàn bộ các con khác (Chết chùm).
+4.1. coroutineScope / Job (Chết chùm)
+ * Tính hủy bỏ (Cancellation) có tính chất 2 chiều.
+ * Nếu gọi 2 API bằng async trong coroutineScope, nếu API 1 ném Exception, API 2 đang chạy cũng bị hủy ngang lập tức.
+4.2. supervisorScope / SupervisorJob (Sống sót độc lập)
+ * Tính hủy bỏ chỉ có 1 chiều (từ trên xuống). Lỗi của đứa con không làm ảnh hưởng đến cha và các anh em của nó.
+ * Thực chiến 1: Custom Scope cho Background Class
+   // Lỗi ở 1 tác vụ mạng không làm sập toàn bộ scope quản lý của Class này
+val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+ * Thực chiến 2: Gọi nhiều API an toàn trong suspend function
+   suspend fun fetchSafeData() = supervisorScope {
+    val def1 = async { api1() }
+    val def2 = async { api2() }
+
+    // Bắt buộc phải try-catch quanh await() để lấy dữ liệu thành công từ API không lỗi
+    val data1 = try { def1.await() } catch (e: Exception) { null }
+    val data2 = try { def2.await() } catch (e: Exception) { null }
+}
+
+   (Lưu ý: viewModelScope mặc định được cấu tạo từ SupervisorJob()).
+4.3. CoroutineExceptionHandler (CEH)
+ * Dùng để catch các exception không được bắt (unhandled exceptions).
+ * Quy tắc vàng: Chỉ hoạt động với launch (không có tác dụng với async vì async tự giữ lỗi) và chỉ có tác dụng khi gắn ở Root Coroutine (Coroutine cha ngoài cùng).
+ * Cách dùng:
+   val ceh = CoroutineExceptionHandler { _, exception ->
+    Log.e("Error", "Caught by CEH: ${exception.message}")
+}
+
+viewModelScope.launch(ceh) {
+    throw RuntimeException("Crash!") // Không làm sập app, nhảy vào CEH
+}
+
 
 ### 5. Hardware & Background (Điểm "ăn tiền" của Petstory)
 * **BLE (Bluetooth Low Energy):**
