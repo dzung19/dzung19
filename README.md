@@ -197,3 +197,72 @@ viewModelScope.launch(ceh) {
 
 **💡 Từ khóa ghi điểm (Senior Tip):**
 "Dạ, khi em biến một Flow bình thường thành StateFlow bằng hàm `.stateIn()`, hàm này bắt buộc em phải truyền vào một cái `scope`. Em truyền `viewModelScope` vào đó, nên StateFlow của em sẽ ăn theo vòng đời của ViewModel ạ. Ngoài ra em hay dùng thuộc tính `SharingStarted.WhileSubscribed(5000)` để quy định rằng: Nếu người dùng ẩn app đi quá 5 giây (không còn ai collect), StateFlow sẽ tự động ngủ để tiết kiệm RAM."
+CẨM NANG PHỎNG VẤN ANDROID MID/SENIOR
+(Tập trung vào Coroutines, Flow, Hilt, và Advanced Kotlin)
+
+PHẦN 1: KOTLIN COROUTINES & THREADING NÂNG CAO
+1. withContext vs async/await
+
+withContext: Dùng để chuyển luồng tuần tự (Sequential). Coroutine gọi nó sẽ tạm dừng chờ kết quả trả về. Dùng khi các tác vụ phụ thuộc nhau (VD: Lấy config -> Giải mã -> Gửi JNI).
+
+async/await: Dùng để chạy đồng thời (Concurrent). Tạo coroutine mới chạy song song, trả về Deferred. Dùng khi có >= 2 tác vụ độc lập cần chạy đua tiết kiệm thời gian (VD: Gọi API server list + API user info cùng lúc).
+
+2. Cooperative Cancellation (Hủy hợp tác)
+Lệnh job.cancel() không giết luồng thô bạo mà chỉ bật cờ isActive = false. Nếu có vòng lặp tính toán nặng (không dùng hàm suspend), phải dùng while(isActive) hoặc gọi yield() để chủ động thoát vòng lặp, tránh Memory Leak.
+
+3. Bí mật Dispatchers.Main vs Dispatchers.Main.immediate
+
+Main: Đẩy tác vụ xuống Message Queue (Handler.post()). Dù đang ở Main Thread vẫn bị bắt xếp hàng, gây trễ 1 frame hình (flicker).
+
+Main.immediate: Kiểm tra luồng hiện tại. Nếu đã ở sẵn Main Thread, chạy đồng bộ (synchronously) ngay lập tức. Tối ưu tuyệt đối cho cập nhật UI/Jetpack Compose.
+
+4. Tối ưu Doze Mode (App ngủ sâu) cho ứng dụng VPN
+Tuyệt đối không dùng Kotlin Coroutines/Timer để gửi ping "keep-alive" ngầm vì sẽ liên tục đánh thức CPU (Wakeup) và máy ảo ART, dẫn đến bị OS "kill". Giải pháp Senior là ủy quyền (delegate) toàn bộ socket mạng cho tầng Native (GoBackend/C++ qua JNI). Cấu hình PersistentKeepalive cho WireGuard để Native tự ping mạng bằng tài nguyên cực thấp, trong khi Kotlin Lifecycle chủ động hủy các Job update UI khi màn hình tắt.
+
+PHẦN 2: KOTLIN FLOW TRONG THỰC CHIẾN
+1. Cold Flow vs Hot Flow (State Management)
+Flow mặc định là Cold (gọi API lại từ đầu với mỗi Collector mới). Để chia sẻ dữ liệu cho nhiều UI component mà chỉ gọi API 1 lần, dùng stateIn (chuyển thành StateFlow). Tham số tối ưu là SharingStarted.WhileSubscribed(5000) để giữ cache data 5s khi xoay màn hình.
+
+2. Quản lý One-time Event (Sự kiện 1 lần)
+Dùng SharedFlow (replay = 0) thay vì StateFlow để hiển thị Snackbar/Toast lỗi. Tránh lỗi hiển thị lại thông báo (replay) vô lý khi thiết bị xoay màn hình (Configuration Change).
+
+3. Backpressure (Áp lực dữ liệu dội về quá nhanh)
+Sử dụng toán tử conflate() cho các luồng cập nhật UI (như biểu đồ tốc độ mạng). Khi UI đang bận vẽ, nó sẽ vứt bỏ (drop) các giá trị trung gian và chỉ lấy giá trị mới nhất cho lần vẽ tiếp theo, giúp app không bị OOM.
+
+4. Gộp luồng dữ liệu UI
+Dùng combine thay vì zip. combine lưu giữ giá trị mới nhất của mọi luồng; chỉ cần 1 luồng (như User Status) cập nhật, nó sẽ ghép ngay với giá trị lưu trữ của luồng kia (như Server List) để render UI lập tức. zip sẽ đứng chờ 1-1 gây mất data.
+
+5. Exception Transparency & Context Preservation
+
+Context: Không dùng withContext bọc khối emit. Bắt buộc dùng flowOn(Dispatchers.IO) để đổi luồng cho Upstream.
+
+Exception: Toán tử .catch { } chỉ bắt lỗi từ Upstream. Đẩy logic UI vào .onEach { } và đặt .catch { } ở dưới cùng để gom toàn bộ lỗi (tránh crash do NullPointerException lúc parse data).
+
+PHẦN 3: DEPENDENCY INJECTION VỚI DAGGER HILT
+1. Sức mạnh của @Binds và @Qualifier
+
+Dùng @Binds với abstract class/function để liên kết Interface với Class thực thi (Implementation). Giúp Dagger không phải sinh ra class Factory trung gian, tối ưu tốc độ build và size APK.
+
+Dùng @Qualifier (VD: @WireGuardProtocol, @OpenVpnProtocol) để chỉ đường cho Hilt khi một Interface có nhiều class thực thi (Đa hình - Polymorphism).
+
+Kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class VpnProtocolModule {
+    @Binds
+    @Singleton
+    @WireGuardProtocol
+    abstract fun bindWireGuardConnection(impl: WireGuardConnectionImpl): VpnConnection
+}
+2. Cạm bẫy Memory Leak
+Chỉ được phép inject @ApplicationContext vào các object khai báo ở SingletonComponent (như GoBackend hoặc Room Database). Dùng @ActivityContext sẽ ghim chết Activity trong RAM vĩnh viễn.
+
+PHẦN 4: KOTLIN NÂNG CAO (UNDER THE HOOD)
+1. Giải quyết Type Erasure với inline + <reified T>
+Bản chất JVM xóa thông tin kiểu Generic lúc chạy (Runtime). Dùng inline để copy code và <reified T> để thay thế cứng kiểu class. Giúp code parse JSON cực sạch: Gson().fromJsonClean<VpnConfig>(jsonString).
+
+2. Tối ưu RAM với Value Class (Zero-cost Abstraction)
+Dùng @JvmInline value class IpAddress(val value: String). Đảm bảo Type-Safety tuyệt đối lúc code (không truyền nhầm tham số String), nhưng khi compile ra mã máy (Bytecode) sẽ bị lột bỏ vỏ class, chỉ giữ lại kiểu nguyên thủy (primitive), không tốn chi phí cấp phát object mới trên RAM.
+
+3. "Chiếc phễu API" với Generic Covariance (<out T>)
+Bọc API dùng chung để loại bỏ try-catch và boilerplate ở tầng ViewModel.
