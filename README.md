@@ -24,6 +24,35 @@
     * *Khai báo (Declarative):* Mô tả UI nên trông thế nào dựa trên State hiện tại.
     * *Recomposition:* Tự động vẽ lại những Composable có State bị thay đổi, bỏ qua những cái không đổi (tiết kiệm tài nguyên).
     * *State:* `remember` (giữ state khi recompose), `rememberSaveable` (giữ state khi xoay màn hình).
+    * *3 Giai đoạn (Phases) của Jetpack Compose:*
+Mỗi khi vẽ UI, Compose đi qua 3 bước:
+
+Composition (Sắp xếp UI Tree): Xác định CÓ những component nào trên màn hình (Hàng nặng nhất).
+
+Layout (Đo đạc & Vị trí): Xác định component đó NẰM Ở ĐÂU và TO BAO NHIÊU.
+
+Draw (Vẽ Pixel): Đổ màu, vẽ hình dáng lên màn hình.
+
+Khi nào dùng Đọc Trực Tiếp (Direct Read) vs Trì Hoãn (Deferred Read)?
+1. Giá trị "Không tĩnh" nhưng ít thay đổi -> Đọc trực tiếp (Bình thường)
+Ví dụ: Tên người dùng, Trạng thái Đăng nhập (True/False), Nút bật/tắt kết nối VPN.
+
+Cách làm: Dùng val name by viewModel.name.collectAsState().
+
+Lý do: Các giá trị này hiếm khi thay đổi. Khi nó thay đổi, việc chạy lại Giai đoạn 1 (Composition) là hoàn toàn bình thường và không gây lag. Không cần thiết phải dùng Deferred (dùng sẽ làm code phức tạp không đáng có - Overengineering).
+
+2. Giá trị "Không tĩnh" và thay đổi LIÊN TỤC -> BẮT BUỘC dùng Deferred (Lambda)
+Ví dụ: Tốc độ mạng thời gian thực (như WakeVPN của bạn), Tọa độ cuộn (Scroll Offset), Animation.
+
+Cách làm: Bọc state vào một Lambda function { state.value }.
+
+Lý do: Kỹ thuật Deferred giúp chúng ta "lừa" Jetpack Compose bỏ qua Giai đoạn 1 (Composition) hoặc thu hẹp tối đa phạm vi của nó.
+
+Cụ thể, Deferred có 2 sức mạnh chính:
+
+Cô lập Recomposition (Component Isolation): Như ví dụ về tốc độ mạng của bạn ở trên, khi bọc bằng Lambda, màn hình cha không hề biết giá trị thực sự là gì, nên màn hình cha KHÔNG bị Recompose. Chỉ có màn hình con (Text) nhận Lambda mới bị Recompose.
+
+Bỏ qua hoàn toàn Composition (Phase Skipping): Khi bạn làm Animation kéo thả UI (Scroll/Offset). Nếu bạn đưa thẳng tọa độ X, Y vào Modifier.offset(x, y), hệ thống sẽ chạy lại cả 3 giai đoạn mỗi mili-giây -> Cực kỳ lag. Nhưng nếu bạn dùng Lambda Modifier là Modifier.offset { IntOffset(x, y) }, Jetpack Compose sẽ bỏ qua hoàn toàn Giai đoạn 1, chỉ chạy Giai đoạn 2 và 3 để di chuyển UI -> Mượt mà ở mức 120fps.
 * **Android XML:**
     * *RecyclerView tối ưu:* Dùng `ViewHolder` để tái sử dụng view, dùng `DiffUtil` để chỉ cập nhật những item thực sự thay đổi thay vì `notifyDataSetChanged()`.
 
