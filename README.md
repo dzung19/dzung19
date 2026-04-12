@@ -295,3 +295,55 @@ Dùng @JvmInline value class IpAddress(val value: String). Đảm bảo Type-Saf
 
 3. "Chiếc phễu API" với Generic Covariance (<out T>)
 Bọc API dùng chung để loại bỏ try-catch và boilerplate ở tầng ViewModel.
+### 11. Networking & VPN Deep Dive
+
+### Giao thức Vận chuyển
+- **TCP (Transmission Control Protocol):** Tin cậy, có bắt tay 3 bước, đảm bảo thứ tự dữ liệu nhưng chậm.
+- **UDP (User Datagram Protocol):** Tốc độ cao, không bắt tay, không đảm bảo thứ tự. Phù hợp cho Stream/VPN Tunnel.
+
+### Bảo mật & Hệ thống
+- **DNS Leak:** Hiện tượng truy vấn tên miền bị lọt ra ngoài đường ống VPN.
+- **TLS (Transport Layer Security):** Kết hợp mã hóa bất đối xứng (trao đổi khóa) và đối xứng (truyền dữ liệu).
+- **WireGuard:** Giao thức VPN hiện đại, dùng **Cryptokey Routing** và chạy trên **UDP**.
+- **Diffie-Hellman (ECDH):** Cơ chế trao đổi khóa bí mật qua môi trường công khai mà không cần gửi trực tiếp chìa khóa.
+
+---
+
+## 4. Cấu trúc dữ liệu & Thuật toán Nâng cao
+
+### Tìm kiếm (Search)
+- **Trie:** Cây tiền tố, tối ưu cho Autocomplete.
+- **A* (A-Star):** Tìm đường đi ngắn nhất thông minh dựa trên hàm Heuristic.
+- **Hashing:** Tìm kiếm tức thời $O(1)$ dựa trên bảng băm.
+
+### Sắp xếp (Sort)
+- **Quick Sort:** Nhanh, thân thiện với cache, trung bình $O(n \log n)$.
+- **Merge Sort:** Ổn định, phù hợp với dữ liệu lớn/Linked List.
+- **Heap Sort:** Tối ưu bộ nhớ $O(1)$ (in-place).
+- **Tim Sort:** Thuật toán lai (Hybrid) dùng mặc định trong Kotlin/Java, cực mạnh với dữ liệu thực tế.
+
+---
+
+## 5. Bluetooth Low Energy (BLE)
+
+### GATT Architecture
+- **Service:** Ngăn chứa các nhóm chức năng.
+- **Characteristic:** Nơi chứa dữ liệu thực tế (Đọc/Ghi/Thông báo).
+
+### Lưu ý quan trọng
+- **Callback Thread:** `BluetoothGattCallback` chạy trên Binder Thread, không được cập nhật UI trực tiếp.
+- **Sequential Write:** Android không có queue cho BLE. Phải chờ `onCharacteristicWrite` xong mới được gửi lệnh tiếp theo.
+- **Android 13+:** Sử dụng hàm `writeCharacteristic` mới truyền mảng byte trực tiếp thay vì set qua `characteristic.value`.
+
+---
+
+## 6. Build & Android Framework
+
+### ProGuard / R8
+- **Shrinking:** Xóa code thừa.
+- **Obfuscation:** Đổi tên class/hàm thành ký tự vô nghĩa (a, b, c) để chống dịch ngược.
+- **Optimization:** Tối ưu hóa bytecode.
+- **Lưu ý:** Cần dùng `@Keep` hoặc `-keep rules` cho Data Models (tránh lỗi Gson/Reflection).
+
+### ViewModel Lifecycle
+- Khi xoay màn hình (Configuration Change), Activity bị hủy nhưng ViewModel sống sót nhờ được lưu trong **`ViewModelStore`** được hệ thống "tạm giữ" và bàn giao lại cho Activity mới.
