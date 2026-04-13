@@ -1,349 +1,142 @@
+***
+
 # BÍ KÍP PHỎNG VẤN ANDROID DEVELOPER (Dzung19)
 
-## MẸO HỌC KHÔNG CẦN HỌC THUỘC LÒNG 🧠
-1. **Kỹ thuật Feynman (Dạy lại cho người khác):** Thử giải thích một khái niệm (VD: Clean Architecture) thành lời nói mộc mạc nhất như đang giải thích cho một người không biết code. Nếu bị vấp, tức là chỗ đó bạn chưa hiểu sâu.
-2. **Gắn với thực tế dự án:** - Khi ôn về **XML & Tối ưu UI**, hãy nhớ lại lúc làm `Samsung Messages`.
-   - Khi ôn về **Compose, Clean Arch, BLE**, hãy mở lại source code của `Petstory` trên GitHub để xem luồng đi của data.
-3. **Trả lời theo công thức STAR:** **S**ituation (Tình huống) -> **T**ask (Nhiệm vụ) -> **A**ction (Hành động của bạn) -> **R**esult (Kết quả).
-4. **Hỏi ngược lại "Tại sao?":** Tại sao lại dùng StateFlow mà không dùng LiveData? Tại sao tách Domain layer? Hiểu "Tại sao" sẽ giúp bạn nhớ "Cái gì" và "Như thế nào".
+## 1. MẸO HỌC KHÔNG CẦN HỌC THUỘC LÒNG 🧠
+* **Kỹ thuật Feynman (Dạy lại cho người khác):** Thử giải thích một khái niệm (VD: Clean Architecture) thành lời nói mộc mạc nhất. Nếu bị vấp, tức là chỗ đó chưa hiểu sâu.
+* **Gắn với thực tế dự án:** * Khi ôn về **XML & Tối ưu UI**, hãy nhớ lại lúc làm `Samsung Messages`.
+   * Khi ôn về **Compose, Clean Arch, BLE**, hãy mở lại source code của `Petstory` trên GitHub để xem luồng đi của data.
+* **Trả lời theo công thức STAR:** **S**ituation (Tình huống) -> **T**ask (Nhiệm vụ) -> **A**ction (Hành động) -> **R**esult (Kết quả).
+* **Hỏi ngược lại "Tại sao?":** Tại sao dùng StateFlow mà không dùng LiveData? Hiểu "Tại sao" sẽ giúp bạn nhớ "Cái gì" và "Như thế nào".
 
 ---
 
-## KIẾN THỨC CỐT LÕI (Q&A NGẮN GỌN) 🚀
+## 2. KIẾN TRÚC & QUẢN LÝ VÒNG ĐỜI (ARCHITECTURE & LIFECYCLE) 🏛️
 
-### 1. Kiến trúc (Architecture)
-* **Clean Architecture là gì?** * Chia app thành 3 tầng: Presentation (UI), Domain (Business logic), Data (API/DB). 
-    * *Từ khóa:* Độc lập, dễ test, dễ thay đổi UI/Database mà không ảnh hưởng logic lõi.
-* **MVVM & ViewModel:**
-    * ViewModel giữ data cho UI, sống sót qua Configuration Changes (xoay màn hình).
-    * *Lưu ý:* ViewModel không bao giờ được chứa reference đến View (Context, Activity) để tránh Memory Leak.
-* **Dependency Injection (Hilt):** * Cung cấp các object (phụ thuộc) từ bên ngoài vào class thay vì class tự tạo ra. Giúp code lỏng lẻo (loose coupling) và dễ viết Unit Test.
+### Clean Architecture & DI
+* **Clean Architecture:** Chia app thành 3 tầng: Presentation (UI), Domain (Business logic), Data (API/DB). Độc lập, dễ test, dễ thay đổi UI/Database mà không ảnh hưởng logic lõi.
+* **Dependency Injection (Hilt):** "Tiêm" phụ thuộc từ ngoài vào thay vì class tự khởi tạo. Giúp code lỏng lẻo (loose coupling).
+   * **@Binds & @Qualifier:** Dùng `@Binds` liên kết Interface với Implementation để tối ưu tốc độ build. Dùng `@Qualifier` (VD: `@WireGuardProtocol`) để chỉ đường cho Hilt khi có nhiều class thực thi (Đa hình).
+   * **Cạm bẫy Memory Leak:** Chỉ inject `@ApplicationContext` ở mức SingletonComponent. Dùng `@ActivityContext` sai chỗ sẽ ghim chết Activity trong RAM.
 
-### 2. Giao diện (UI)
-* **Jetpack Compose:**
-    * *Khai báo (Declarative):* Mô tả UI nên trông thế nào dựa trên State hiện tại.
-    * *Recomposition:* Tự động vẽ lại những Composable có State bị thay đổi, bỏ qua những cái không đổi (tiết kiệm tài nguyên).
-    * *State:* `remember` (giữ state khi recompose), `rememberSaveable` (giữ state khi xoay màn hình).
-    * *3 Giai đoạn (Phases) của Jetpack Compose:*
-Mỗi khi vẽ UI, Compose đi qua 3 bước:
+### Vòng đời Activity (Như một vở kịch)
+* **`onCreate()`:** Dựng rạp, làm bối cảnh (chỉ chạy 1 lần).
+* **`onStart()`:** Kéo rèm. Giao diện hiện lên nhưng chưa tương tác được.
+* **`onResume()`:** Vở kịch bắt đầu. Người dùng tương tác (Foreground).
+* **`onPause()`:** Tạm dừng kịch (có Dialog đè lên hoặc chia đôi màn hình). Vẫn hiển thị nhưng mất quyền tương tác.
+* **`onStop()`:** Kéo rèm đóng lại (thoát ra Home). App rơi vào Background.
+* **`onDestroy()`:** Dỡ bỏ rạp (vuốt tắt app hoặc bị hệ thống kill).
 
-Composition (Sắp xếp UI Tree): Xác định CÓ những component nào trên màn hình (Hàng nặng nhất).
-
-Layout (Đo đạc & Vị trí): Xác định component đó NẰM Ở ĐÂU và TO BAO NHIÊU.
-
-Draw (Vẽ Pixel): Đổ màu, vẽ hình dáng lên màn hình.
-
-Khi nào dùng Đọc Trực Tiếp (Direct Read) vs Trì Hoãn (Deferred Read)?
-1. Giá trị "Không tĩnh" nhưng ít thay đổi -> Đọc trực tiếp (Bình thường)
-Ví dụ: Tên người dùng, Trạng thái Đăng nhập (True/False), Nút bật/tắt kết nối VPN.
-
-Cách làm: Dùng val name by viewModel.name.collectAsState().
-
-Lý do: Các giá trị này hiếm khi thay đổi. Khi nó thay đổi, việc chạy lại Giai đoạn 1 (Composition) là hoàn toàn bình thường và không gây lag. Không cần thiết phải dùng Deferred (dùng sẽ làm code phức tạp không đáng có - Overengineering).
-
-2. Giá trị "Không tĩnh" và thay đổi LIÊN TỤC -> BẮT BUỘC dùng Deferred (Lambda)
-Ví dụ: Tốc độ mạng thời gian thực (như WakeVPN của bạn), Tọa độ cuộn (Scroll Offset), Animation.
-
-Cách làm: Bọc state vào một Lambda function { state.value }.
-
-Lý do: Kỹ thuật Deferred giúp chúng ta "lừa" Jetpack Compose bỏ qua Giai đoạn 1 (Composition) hoặc thu hẹp tối đa phạm vi của nó.
-
-Cụ thể, Deferred có 2 sức mạnh chính:
-
-Cô lập Recomposition (Component Isolation): Như ví dụ về tốc độ mạng của bạn ở trên, khi bọc bằng Lambda, màn hình cha không hề biết giá trị thực sự là gì, nên màn hình cha KHÔNG bị Recompose. Chỉ có màn hình con (Text) nhận Lambda mới bị Recompose.
-
-Bỏ qua hoàn toàn Composition (Phase Skipping): Khi bạn làm Animation kéo thả UI (Scroll/Offset). Nếu bạn đưa thẳng tọa độ X, Y vào Modifier.offset(x, y), hệ thống sẽ chạy lại cả 3 giai đoạn mỗi mili-giây -> Cực kỳ lag. Nhưng nếu bạn dùng Lambda Modifier là Modifier.offset { IntOffset(x, y) }, Jetpack Compose sẽ bỏ qua hoàn toàn Giai đoạn 1, chỉ chạy Giai đoạn 2 và 3 để di chuyển UI -> Mượt mà ở mức 120fps.
-* **Android XML:**
-    * *RecyclerView tối ưu:* Dùng `ViewHolder` để tái sử dụng view, dùng `DiffUtil` để chỉ cập nhật những item thực sự thay đổi thay vì `notifyDataSetChanged()`.
-
-### 3. Luồng dữ liệu (State & Flow)
-* **Phân biệt State - StateFlow - SharedFlow:**
-    * **State (Compose):** Giữ giá trị tại UI. Khi đổi giá trị -> báo UI vẽ lại (Recomposition). *Ví dụ: Công tắc đèn.*
-    * **StateFlow:** Luôn giữ 1 trạng thái mới nhất, BẮT BUỘC có giá trị khởi tạo. Dùng để chứa data hiển thị (Danh sách, chữ, loading). *Ví dụ: Bảng tỷ số bóng đá (luôn có số, ai nhìn lên là thấy tỷ số mới nhất).*
-    * **SharedFlow:** Bắn sự kiện 1 lần (One-time event), KHÔNG có giá trị khởi tạo, KHÔNG lưu trạng thái cũ. Dùng để bắn Toast, chuyển màn hình, báo lỗi mạng. *Ví dụ: Tiếng loa thông báo ở sân bay (nghe xong là bay theo gió, người đến sau không nghe được nữa).*
-    * *Tip ăn điểm:* Dùng SharedFlow bắn lỗi mạng để tránh xoay màn hình (recompose) bị bắn lỗi 2 lần.
-
-* **Toán tử Flow (Search API thực tế):**
-    * **`debounce(300ms)`:** Trì hoãn. Chờ user gõ xong (ngừng gõ 300ms) mới cho luồng chạy tiếp -> Chống spam gọi API rác lên Server.
-    * **`flatMapLatest`:** Nếu có request mới (chữ "CHO"), lập tức HỦY request cũ (chữ "C") -> Tránh lỗi Race Condition (mạng lag làm data cũ đè lên data mới).
-    * **`collectAsStateWithLifecycle()`:** Dùng trong Compose để hứng Flow. Siêu năng lực của nó là tự động ngừng collect khi app rơi vào Background (chưa tới `STARTED`) để tiết kiệm pin/mạng, không cần tự code `onPause` rườm rà.
- 
-### 4. Xử lý Bất đồng bộ (Coroutines & withContext)
-* **Coroutines vs Threads:**
-    * Thread (Luồng) do Hệ điều hành quản lý, rất nặng. Tạo nhiều Thread sẽ tràn RAM.
-    * Coroutine cực kỳ nhẹ (Lightweight thread), do Kotlin quản lý. Có thể chạy hàng ngàn Coroutine trên 1 Thread duy nhất mà không tốn tài nguyên. Tính chất quan trọng nhất là **Non-blocking (Không chặn luồng)**.
-
-* **Các loại Dispatchers (Nơi phân công công việc):**
-    * `Dispatchers.Main`: Chuyên làm việc với UI (Cập nhật text, list, hiện Toast).
-    * `Dispatchers.IO`: Chuyên ra vào ổ cứng và mạng (Gọi API, đọc/ghi Room DB, SharePreferences).
-    * `Dispatchers.Default`: Chuyên tính toán nặng tốn CPU (Lọc mảng dữ liệu khổng lồ, xử lý ảnh, mã hóa).
-
-* **Hàm `withContext` (Bộ đàm chuyển luồng thần thánh):**
-    * **Bản chất:** Là một `suspend function` (hàm tạm ngưng). Nó giúp ta **chuyển đổi luồng (switch context)** ngay giữa chừng mà không cần dùng callback lồng nhau (Callback Hell).
-    * Nó tạm ngưng coroutine hiện tại, vứt cục code bên trong sang một luồng khác chạy, chạy xong thì trả kết quả về đúng cái luồng ban đầu.
-    * **Câu trả lời thực chiến (Ăn điểm tối đa):** *"Trong project Petstory của em, khi gọi API hoặc query Room DB ở tầng Data/Repository, em luôn bọc nó trong `withContext(Dispatchers.IO)` để ép nó chạy ở luồng nền. Nhờ vậy, khi kết quả trả về tầng ViewModel (đang chạy ở `viewModelScope` thuộc Main Thread), em có thể lấy data đó gán thẳng vào StateFlow để cập nhật UI ngay lập tức mà không bao giờ sợ ứng dụng bị crash do lỗi 'Chạm vào UI từ luồng nền'."*
-* **Khác:
-1. Các khái niệm cốt lõi (Core Concepts)
-1.1. Coroutine là gì?
- * Là các "luồng siêu nhẹ" (lightweight threads). Khác với Thread truyền thống của OS (tiêu tốn nhiều RAM và thời gian khởi tạo), bạn có thể chạy hàng trăm ngàn Coroutines cùng lúc mà không lo sập ứng dụng (OOM).
- * Bản chất: Coroutine không thay thế Thread, nó chạy trên Thread. Một Thread có thể chạy nhiều Coroutine. Khi một Coroutine bị suspend (tạm dừng), Thread bên dưới nó sẽ được giải phóng để đi chạy Coroutine khác.
-1.2. Hàm suspend
- * Từ khóa suspend đánh dấu một hàm có khả năng tạm dừng (pause) và tiếp tục (resume) sau đó.
- * Quy tắc vàng: Hàm suspend chỉ có thể được gọi từ bên trong một Coroutine hoặc từ một hàm suspend khác.
-1.3. Dispatchers (Bộ điều phối)
-Quyết định Coroutine sẽ chạy trên Thread Pool nào:
- * Dispatchers.Main: Luồng UI (Main Thread). Dùng để cập nhật giao diện, gọi LiveData/StateFlow.
- * Dispatchers.IO: Luồng tối ưu cho Network, Database, Đọc/Ghi file.
- * Dispatchers.Default: Luồng tối ưu cho các tác vụ tính toán nặng ngốn CPU (Parse JSON khổng lồ, xử lý ảnh/bitmap, mã hóa dữ liệu).
- * Dispatchers.Unconfined: Bắt đầu ở luồng hiện tại, nhưng sau khi resume từ một suspend point, nó có thể chạy ở bất kỳ luồng nào. (Ít dùng trong thực tế).
-2. Coroutine Builders & Scopes (Khởi tạo & Vòng đời)
-2.1. Builders: launch vs async
- * launch: "Bắn và quên" (Fire-and-forget). Dùng khi không cần trả về kết quả. Trả về một Job (dùng để quản lý vòng đời, cancel). Lỗi xảy ra trong launch sẽ ném thẳng ra ngoài (gây crash nếu không catch).
- * async: Dùng khi cần trả về một kết quả. Trả về một Deferred<T>. Lỗi xảy ra trong async được gói lại bên trong Deferred và chỉ nổ khi gọi hàm .await().
-2.2. Coroutine Scope (Phạm vi hoạt động)
-Scope giúp quản lý vòng đời của Coroutine, tránh rò rỉ bộ nhớ (Memory Leak) khi người dùng thoát màn hình.
- * GlobalScope: Sống theo vòng đời của toàn bộ App. (Anti-pattern, hạn chế dùng).
- * viewModelScope: Sống theo ViewModel. Tự động hủy các Coroutines khi ViewModel bị cleared.
- * lifecycleScope: Sống theo Activity/Fragment.
- * Custom Scope: Tự định nghĩa cho các class chạy ngầm (ví dụ: Repositories, Managers).
-   val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-3. Đồng thời (Concurrency) với async/await
-Bài toán: Cần gọi 2 API độc lập (A mất 2s, B mất 2s).
- * Chạy tuần tự (Sequential): Tổng mất 4s.
- * Chạy đồng thời (Concurrent): Dùng async, tổng chỉ mất 2s.
-suspend fun fetchDashboardData() = coroutineScope {
-    // Bắn 2 request đi cùng lúc trên luồng nền
-    val deferredA = async(Dispatchers.IO) { api.getDataA() }
-    val deferredB = async(Dispatchers.IO) { api.getDataB() }
-
-    // Đợi kết quả
-    val resultA = deferredA.await()
-    val resultB = deferredB.await()
-    
-    return DashboardData(resultA, resultB)
-}
-
-4. Quản lý lỗi (Exception Handling) & Structured Concurrency
-Đây là phần quan trọng nhất để phân loại ứng viên Senior. Nguyên tắc chung: Lỗi của một Coroutine con sẽ lan truyền lên scope cha và hủy bỏ toàn bộ các con khác (Chết chùm).
-4.1. coroutineScope / Job (Chết chùm)
- * Tính hủy bỏ (Cancellation) có tính chất 2 chiều.
- * Nếu gọi 2 API bằng async trong coroutineScope, nếu API 1 ném Exception, API 2 đang chạy cũng bị hủy ngang lập tức.
-4.2. supervisorScope / SupervisorJob (Sống sót độc lập)
- * Tính hủy bỏ chỉ có 1 chiều (từ trên xuống). Lỗi của đứa con không làm ảnh hưởng đến cha và các anh em của nó.
- * Thực chiến 1: Custom Scope cho Background Class
-   // Lỗi ở 1 tác vụ mạng không làm sập toàn bộ scope quản lý của Class này
-val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
- * Thực chiến 2: Gọi nhiều API an toàn trong suspend function
-   suspend fun fetchSafeData() = supervisorScope {
-    val def1 = async { api1() }
-    val def2 = async { api2() }
-
-    // Bắt buộc phải try-catch quanh await() để lấy dữ liệu thành công từ API không lỗi
-    val data1 = try { def1.await() } catch (e: Exception) { null }
-    val data2 = try { def2.await() } catch (e: Exception) { null }
-}
-
-   (Lưu ý: viewModelScope mặc định được cấu tạo từ SupervisorJob()).
-4.3. CoroutineExceptionHandler (CEH)
- * Dùng để catch các exception không được bắt (unhandled exceptions).
- * Quy tắc vàng: Chỉ hoạt động với launch (không có tác dụng với async vì async tự giữ lỗi) và chỉ có tác dụng khi gắn ở Root Coroutine (Coroutine cha ngoài cùng).
- * Cách dùng:
-   val ceh = CoroutineExceptionHandler { _, exception ->
-    Log.e("Error", "Caught by CEH: ${exception.message}")
-}
-
-viewModelScope.launch(ceh) {
-    throw RuntimeException("Crash!") // Không làm sập app, nhảy vào CEH
-}
-
-
-### 5. Hardware & Background (Điểm "ăn tiền" của Petstory)
-* **BLE (Bluetooth Low Energy):**
-    * 3 bước cơ bản: Scan -> Connect (GATT) -> Discover Services/Characteristics.
-* **Giữ kết nối ngầm không bị Android "kill" (Doze Mode):**
-    * BẮT BUỘC dùng **Foreground Service**.
-    * BẮT BUỘC phải đính kèm một **Notification cố định** để báo cho người dùng biết app đang chạy ngầm.
-    * *Tip update Android 14+:* Phải khai báo thuộc tính `foregroundServiceType="connectedDevice"` trong `AndroidManifest.xml` để hệ điều hành cấp phép duy trì kết nối với vòng cổ thú cưng.
-
-### 6. Lưu trữ (Local Storage)
-* **Room / SQLite lưu data vào đâu?**
-    * Lưu thành file vật lý tại thư mục đóng kín (Sandbox): `/data/data/<package_name>/databases/`.
-    * Các app khác không thể đọc được. Muốn chia sẻ data an toàn ra ngoài (như app nhắn tin), phải dùng **Content Provider**.
-* **Room vs SharedPreferences:**
-    * Room: Data phức tạp, có quan hệ, cần truy vấn.
-    * SharedPreferences: Cặp Key-Value đơn giản (Token, Settings).
-* **SharedPreferences: `apply()` vs `commit()` (Cực kỳ quan trọng)**
-    * **`apply()` (Khuyên dùng 99%):** Lưu **BẤT ĐỒNG BỘ** (Asynchronous). Nó cập nhật dữ liệu ngay lập tức vào bộ nhớ RAM, rồi âm thầm ghi xuống ổ cứng ở dưới background. Không trả về kết quả. Rất an toàn, không làm đơ Main Thread (UI).
-    * **`commit()`:** Lưu **ĐỒNG BỘ** (Synchronous). Nó ghi thẳng xuống ổ cứng và bắt Main Thread phải đứng chờ ghi xong mới được chạy dòng code tiếp theo. Trả về `true`/`false`. 
-    * *Câu trả lời ăn điểm:* "Em luôn dùng `apply()` để tránh lỗi ANR (App Not Responding). Chỉ khi nào em có một logic nghiệp vụ cực kỳ khắt khe, bắt buộc phải biết chắc chắn dữ liệu đã lưu thành công xuống ổ cứng hay chưa thì em mới dùng `commit()`, và khi đó em sẽ ném nó vào luồng Coroutines (Background thread) chứ tuyệt đối không gọi trên Main Thread."
-
-### 7. Kiến trúc (Architecture)
-* **Clean Architecture là gì?** Chia app thành 3 tầng: Presentation (UI), Domain (Business logic), Data (API/DB). Giúp code độc lập, dễ test.
-* **MVVM & ViewModel:** ViewModel giữ data sống sót qua Configuration Changes (xoay màn hình). Tuyệt đối không chứa reference đến View (Context) để tránh Memory Leak.
-* **Dependency Injection (Hilt):** "Tiêm" phụ thuộc từ ngoài vào thay vì class tự khởi tạo. Giúp code lỏng lẻo (loose coupling) và dễ viết Unit Test.
-### 8. Vòng đời (Lifecycle) - Activity & ViewModel
-* **A. Vòng đời Activity (Giống như một Vở kịch)** 
-    * **`onCreate()`:** Dựng rạp, làm bối cảnh (Chỉ chạy 1 lần khi mở app). Chỗ này thường để `setContentView` hoặc gọi Jetpack Compose.
-    * **`onStart()`:** Kéo rèm lên. Khán giả (người dùng) bắt đầu nhìn thấy sân khấu, nhưng diễn viên chưa diễn (UI hiện lên nhưng chưa tương tác được).
-    * **`onResume()`:** Vở kịch chính thức bắt đầu! Người dùng có thể bấm nút, vuốt màn hình. App đang ở trạng thái **Foreground (hiện diện hoàn toàn)**.
-    * **`onPause()`:** Tạm dừng kịch. Xảy ra khi có một Dialog xin quyền (Permission) hiện lên đè một góc màn hình, hoặc chia đôi màn hình. App vẫn *hiển thị một phần* nhưng *mất quyền tương tác*.
-    * **`onStop()`:** Kéo rèm đóng lại. Xảy ra khi bạn bấm nút Home thoát ra ngoài hoặc mở app khác. App bị che khuất hoàn toàn (rơi vào **Background**).
-    * **`onDestroy()`:** Dỡ bỏ rạp kịch. Xảy ra khi bạn vuốt tắt app từ màn hình đa nhiệm, hoặc hệ thống thiếu RAM nên tự "kill" app.
-
-* **B. Vòng đời ViewModel (Người Đạo diễn)** 
-    * **Bản chất:** Đạo diễn thì sống dai hơn bối cảnh sân khấu! 
-    * **Tình huống xoay màn hình (Configuration Change):** Khi người dùng xoay ngang điện thoại, Android sẽ "đập đi xây lại" giao diện -> Tức là Activity sẽ chạy `onPause -> onStop -> onDestroy` rồi lập tức chạy lại `onCreate -> onStart -> onResume`. 
-    * Nếu bạn lưu dữ liệu ở Activity, lúc xoay màn hình data sẽ biến mất (ví dụ: đang gõ form đăng ký dở bị mất sạch chữ). 
-    * **Sức mạnh của ViewModel:** Nó nằm ngoài vòng xoáy sinh tử đó. Xoay màn hình, Activity bị hủy nhưng ViewModel **VẪN SỐNG**. Data giữ nguyên. Nó chỉ thực sự chết (gọi hàm `onCleared()`) khi bạn bấm nút Back để **thoát hẳn** ứng dụng.
-    * **Hàm `onCleared()`:** Nơi dọn dẹp "chiến trường". Câu trả lời ghi điểm: *"Trong ViewModel, em thường dùng `viewModelScope`. Khi ViewModel bị hủy (app tắt hẳn), `onCleared()` được gọi, `viewModelScope` tự động hủy mọi Coroutine đang chạy ngầm gọi API, giúp app của em không bao giờ bị rò rỉ bộ nhớ (Memory Leak)."*
-
-### 9. Khác
-* **RESTful API:** Giao tiếp qua HTTP methods (GET, POST...). Xử lý lỗi bằng Coroutine `try/catch`.
-* **Flutter (BLoC):** BLoC tách UI và Logic qua luồng Event (vào) và State (ra). Rất giống MVVM + StateFlow.
-* **Git:** Phân biệt `merge` (tạo commit gộp) và `rebase` (đắp commit lên đầu nhánh, lịch sử thẳng tắp).
-
-### 10. Firebase Cloud Messaging (FCM) & Database
-* **Device Token bị đổi khi nào?** FCM Token không có hạn sử dụng thời gian. Nó thay đổi khi: Clear Data app, Uninstall/Reinstall, cài sang máy mới. Để server luôn cập nhật: Bắt sự kiện ở hàm `onNewToken()` trong `FirebaseMessagingService` và gọi API gửi lên backend.
-* **Xử lý Thông báo khi App bị "Killed":**
-    * Khi app ở Foreground: Bắt thông báo và data trong hàm `onMessageReceived()` của Service.
-    * Khi app bị Background/Killed: Hệ điều hành tự hiển thị thông báo. Hàm `onMessageReceived()` KHÔNG chạy. Khi user bấm vào thông báo, data payload sẽ được nhét vào `Intent` để mở `MainActivity`. Ta phải lấy data ra ở `onCreate()` bằng lệnh `intent.extras`.
-* **Khả năng Offline của Firebase:** Firebase tự động cache data xuống ổ cứng điện thoại. Khi gọi lệnh lưu data lúc mất mạng, UI vẫn phản hồi thành công ngay. Firebase tự đưa lệnh đó vào hàng đợi và sẽ tự động đồng bộ (sync) lên Server ngay khi có mạng trở lại.
-
-### . Vòng đời của StateFlow thực chất ăn theo cái gì?
-**Câu trả lời chuẩn 10 điểm:** StateFlow phụ thuộc hoàn toàn vào **`CoroutineScope`** mà nó được khởi tạo hoặc được collect (thu thập). Cụ thể chia làm 3 trường hợp:
-
-* **Trường hợp 1: Sống theo Đạo diễn (ViewModel)**
-    * Nếu bạn tạo StateFlow trong ViewModel (dùng `viewModelScope`), nó sẽ sống dai như ViewModel. Xoay màn hình nó không chết. Nó chỉ bị hủy khi ViewModel gọi hàm `onCleared()` (tức là khi thoát hẳn màn hình đó).
-
-* **Trường hợp 2: Sống theo Sân khấu (UI / Jetpack Compose)**
-    * Khi bạn mang cái StateFlow đó ra ngoài giao diện để hiển thị (bằng hàm `collectAsStateWithLifecycle()`), thì quá trình "lắng nghe" (collect) lại ăn theo vòng đời của View (Activity/Fragment).
-    * Sân khấu kéo rèm (`onStop`) -> Dừng collect để tiết kiệm pin. Sân khấu sáng đèn lại (`onStart`) -> Tiếp tục collect.
-
-* **Trường hợp 3: Sống theo Nhà hát (Toàn bộ App)**
-    * Nếu bạn để StateFlow ở một class Singleton (như `UserRepository` hay `BluetoothManager` trong app Petstory) và chạy nó bằng một Scope toàn cục (như `GlobalScope` hoặc scope tự tạo ở tầng Application), thì nó sẽ sống bằng đúng tuổi thọ của ứng dụng. Bấm nút Back thoát app ra ngoài thì nó mới chết.
-
-**💡 Từ khóa ghi điểm (Senior Tip):**
-"Dạ, khi em biến một Flow bình thường thành StateFlow bằng hàm `.stateIn()`, hàm này bắt buộc em phải truyền vào một cái `scope`. Em truyền `viewModelScope` vào đó, nên StateFlow của em sẽ ăn theo vòng đời của ViewModel ạ. Ngoài ra em hay dùng thuộc tính `SharingStarted.WhileSubscribed(5000)` để quy định rằng: Nếu người dùng ẩn app đi quá 5 giây (không còn ai collect), StateFlow sẽ tự động ngủ để tiết kiệm RAM."
-CẨM NANG PHỎNG VẤN ANDROID MID/SENIOR
-(Tập trung vào Coroutines, Flow, Hilt, và Advanced Kotlin)
-
-PHẦN 1: KOTLIN COROUTINES & THREADING NÂNG CAO
-1. withContext vs async/await
-
-withContext: Dùng để chuyển luồng tuần tự (Sequential). Coroutine gọi nó sẽ tạm dừng chờ kết quả trả về. Dùng khi các tác vụ phụ thuộc nhau (VD: Lấy config -> Giải mã -> Gửi JNI).
-
-async/await: Dùng để chạy đồng thời (Concurrent). Tạo coroutine mới chạy song song, trả về Deferred. Dùng khi có >= 2 tác vụ độc lập cần chạy đua tiết kiệm thời gian (VD: Gọi API server list + API user info cùng lúc).
-
-2. Cooperative Cancellation (Hủy hợp tác)
-Lệnh job.cancel() không giết luồng thô bạo mà chỉ bật cờ isActive = false. Nếu có vòng lặp tính toán nặng (không dùng hàm suspend), phải dùng while(isActive) hoặc gọi yield() để chủ động thoát vòng lặp, tránh Memory Leak.
-
-3. Bí mật Dispatchers.Main vs Dispatchers.Main.immediate
-
-Main: Đẩy tác vụ xuống Message Queue (Handler.post()). Dù đang ở Main Thread vẫn bị bắt xếp hàng, gây trễ 1 frame hình (flicker).
-
-Main.immediate: Kiểm tra luồng hiện tại. Nếu đã ở sẵn Main Thread, chạy đồng bộ (synchronously) ngay lập tức. Tối ưu tuyệt đối cho cập nhật UI/Jetpack Compose.
-
-4. Tối ưu Doze Mode (App ngủ sâu) cho ứng dụng VPN
-Tuyệt đối không dùng Kotlin Coroutines/Timer để gửi ping "keep-alive" ngầm vì sẽ liên tục đánh thức CPU (Wakeup) và máy ảo ART, dẫn đến bị OS "kill". Giải pháp Senior là ủy quyền (delegate) toàn bộ socket mạng cho tầng Native (GoBackend/C++ qua JNI). Cấu hình PersistentKeepalive cho WireGuard để Native tự ping mạng bằng tài nguyên cực thấp, trong khi Kotlin Lifecycle chủ động hủy các Job update UI khi màn hình tắt.
-
-PHẦN 2: KOTLIN FLOW TRONG THỰC CHIẾN
-1. Cold Flow vs Hot Flow (State Management)
-Flow mặc định là Cold (gọi API lại từ đầu với mỗi Collector mới). Để chia sẻ dữ liệu cho nhiều UI component mà chỉ gọi API 1 lần, dùng stateIn (chuyển thành StateFlow). Tham số tối ưu là SharingStarted.WhileSubscribed(5000) để giữ cache data 5s khi xoay màn hình.
-
-2. Quản lý One-time Event (Sự kiện 1 lần)
-Dùng SharedFlow (replay = 0) thay vì StateFlow để hiển thị Snackbar/Toast lỗi. Tránh lỗi hiển thị lại thông báo (replay) vô lý khi thiết bị xoay màn hình (Configuration Change).
-
-3. Backpressure (Áp lực dữ liệu dội về quá nhanh)
-Sử dụng toán tử conflate() cho các luồng cập nhật UI (như biểu đồ tốc độ mạng). Khi UI đang bận vẽ, nó sẽ vứt bỏ (drop) các giá trị trung gian và chỉ lấy giá trị mới nhất cho lần vẽ tiếp theo, giúp app không bị OOM.
-
-4. Gộp luồng dữ liệu UI
-Dùng combine thay vì zip. combine lưu giữ giá trị mới nhất của mọi luồng; chỉ cần 1 luồng (như User Status) cập nhật, nó sẽ ghép ngay với giá trị lưu trữ của luồng kia (như Server List) để render UI lập tức. zip sẽ đứng chờ 1-1 gây mất data.
-
-5. Exception Transparency & Context Preservation
-
-Context: Không dùng withContext bọc khối emit. Bắt buộc dùng flowOn(Dispatchers.IO) để đổi luồng cho Upstream.
-
-Exception: Toán tử .catch { } chỉ bắt lỗi từ Upstream. Đẩy logic UI vào .onEach { } và đặt .catch { } ở dưới cùng để gom toàn bộ lỗi (tránh crash do NullPointerException lúc parse data).
-
-PHẦN 3: DEPENDENCY INJECTION VỚI DAGGER HILT
-1. Sức mạnh của @Binds và @Qualifier
-
-Dùng @Binds với abstract class/function để liên kết Interface với Class thực thi (Implementation). Giúp Dagger không phải sinh ra class Factory trung gian, tối ưu tốc độ build và size APK.
-
-Dùng @Qualifier (VD: @WireGuardProtocol, @OpenVpnProtocol) để chỉ đường cho Hilt khi một Interface có nhiều class thực thi (Đa hình - Polymorphism).
-
-Kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class VpnProtocolModule {
-    @Binds
-    @Singleton
-    @WireGuardProtocol
-    abstract fun bindWireGuardConnection(impl: WireGuardConnectionImpl): VpnConnection
-}
-2. Cạm bẫy Memory Leak
-Chỉ được phép inject @ApplicationContext vào các object khai báo ở SingletonComponent (như GoBackend hoặc Room Database). Dùng @ActivityContext sẽ ghim chết Activity trong RAM vĩnh viễn.
-
-PHẦN 4: KOTLIN NÂNG CAO (UNDER THE HOOD)
-1. Giải quyết Type Erasure với inline + <reified T>
-Bản chất JVM xóa thông tin kiểu Generic lúc chạy (Runtime). Dùng inline để copy code và <reified T> để thay thế cứng kiểu class. Giúp code parse JSON cực sạch: Gson().fromJsonClean<VpnConfig>(jsonString).
-
-2. Tối ưu RAM với Value Class (Zero-cost Abstraction)
-Dùng @JvmInline value class IpAddress(val value: String). Đảm bảo Type-Safety tuyệt đối lúc code (không truyền nhầm tham số String), nhưng khi compile ra mã máy (Bytecode) sẽ bị lột bỏ vỏ class, chỉ giữ lại kiểu nguyên thủy (primitive), không tốn chi phí cấp phát object mới trên RAM.
-
-3. "Chiếc phễu API" với Generic Covariance (<out T>)
-Bọc API dùng chung để loại bỏ try-catch và boilerplate ở tầng ViewModel.
-### 11. Networking & VPN Deep Dive
-
-### Giao thức Vận chuyển
-- **TCP (Transmission Control Protocol):** Tin cậy, có bắt tay 3 bước, đảm bảo thứ tự dữ liệu nhưng chậm.
-- **UDP (User Datagram Protocol):** Tốc độ cao, không bắt tay, không đảm bảo thứ tự. Phù hợp cho Stream/VPN Tunnel.
-
-### Bảo mật & Hệ thống
-- **DNS Leak:** Hiện tượng truy vấn tên miền bị lọt ra ngoài đường ống VPN.
-- **TLS (Transport Layer Security):** Kết hợp mã hóa bất đối xứng (trao đổi khóa) và đối xứng (truyền dữ liệu).
-- **WireGuard:** Giao thức VPN hiện đại, dùng **Cryptokey Routing** và chạy trên **UDP**.
-- **Diffie-Hellman (ECDH):** Cơ chế trao đổi khóa bí mật qua môi trường công khai mà không cần gửi trực tiếp chìa khóa.
+### Vòng đời ViewModel (Người Đạo diễn)
+* **Bản chất sống dai:** Khi xoay màn hình, Activity bị "đập đi xây lại", nhưng ViewModel được lưu an toàn trong két sắt **`ViewModelStore`**. Hệ thống lấy két sắt này giao lại cho Activity mới, giúp Data được giữ nguyên.
+* **`onCleared()`:** Nơi dọn dẹp chiến trường. Nó chỉ được gọi khi bấm nút Back thoát hẳn. Tại đây, `viewModelScope` sẽ tự động hủy mọi Coroutine chạy ngầm, chống Memory Leak triệt để.
 
 ---
 
-## 4. Cấu trúc dữ liệu & Thuật toán Nâng cao
+## 3. GIAO DIỆN (UI & JETPACK COMPOSE) 🎨
 
-### Tìm kiếm (Search)
-- **Trie:** Cây tiền tố, tối ưu cho Autocomplete.
-- **A* (A-Star):** Tìm đường đi ngắn nhất thông minh dựa trên hàm Heuristic.
-- **Hashing:** Tìm kiếm tức thời $O(1)$ dựa trên bảng băm.
+### Bản chất Jetpack Compose
+* **Declarative (Khai báo):** Mô tả UI nên trông thế nào dựa trên State hiện tại.
+* **3 Giai đoạn vẽ UI:**
+   1. **Composition:** Xác định CÓ những component nào.
+   2. **Layout:** Xác định NẰM Ở ĐÂU và TO BAO NHIÊU.
+   3. **Draw:** Đổ màu, vẽ pixel.
 
-### Sắp xếp (Sort)
-- **Quick Sort:** Nhanh, thân thiện với cache, trung bình $O(n \log n)$.
-- **Merge Sort:** Ổn định, phù hợp với dữ liệu lớn/Linked List.
-- **Heap Sort:** Tối ưu bộ nhớ $O(1)$ (in-place).
-- **Tim Sort:** Thuật toán lai (Hybrid) dùng mặc định trong Kotlin/Java, cực mạnh với dữ liệu thực tế.
+### Tối ưu Recomposition (Direct Read vs Deferred Read)
+* **Đọc trực tiếp (Direct Read):** `val name by viewModel.name.collectAsState()`. Dùng cho giá trị ít thay đổi (Tên user, Trạng thái đăng nhập).
+* **Trì hoãn (Deferred Read - Lambda):** BẮT BUỘC dùng cho giá trị thay đổi liên tục (Tọa độ scroll, Tốc độ mạng). Việc bọc state vào Lambda `{ state.value }` giúp Compose **bỏ qua hoàn toàn Giai đoạn 1 (Composition)** hoặc cô lập vùng vẽ, giữ UI mượt mà ở 120fps.
 
----
-
-## 5. Bluetooth Low Energy (BLE)
-
-### GATT Architecture
-- **Service:** Ngăn chứa các nhóm chức năng.
-- **Characteristic:** Nơi chứa dữ liệu thực tế (Đọc/Ghi/Thông báo).
-
-### Lưu ý quan trọng
-- **Callback Thread:** `BluetoothGattCallback` chạy trên Binder Thread, không được cập nhật UI trực tiếp.
-- **Sequential Write:** Android không có queue cho BLE. Phải chờ `onCharacteristicWrite` xong mới được gửi lệnh tiếp theo.
-- **Android 13+:** Sử dụng hàm `writeCharacteristic` mới truyền mảng byte trực tiếp thay vì set qua `characteristic.value`.
+### XML Cũ
+* **RecyclerView tối ưu:** Dùng `ViewHolder` tái sử dụng view, dùng `DiffUtil` cập nhật đúng item thay đổi thay vì `notifyDataSetChanged()`.
 
 ---
 
-## 6. Build & Android Framework
+## 4. XỬ LÝ BẤT ĐỒNG BỘ (KOTLIN COROUTINES) ⚡
 
-### ProGuard / R8
-- **Shrinking:** Xóa code thừa.
-- **Obfuscation:** Đổi tên class/hàm thành ký tự vô nghĩa (a, b, c) để chống dịch ngược.
-- **Optimization:** Tối ưu hóa bytecode.
-- **Lưu ý:** Cần dùng `@Keep` hoặc `-keep rules` cho Data Models (tránh lỗi Gson/Reflection).
+### Core Concepts (Bản chất hệ thống)
+* **Coroutines vs Threads:** Coroutines là "luồng siêu nhẹ" do Kotlin quản lý, không thay thế Thread mà chạy trên Thread. Nổi bật với tính chất **Non-blocking (Không chặn luồng)**.
+* **Suspend Function:** Hàm có khả năng tạm dừng và tiếp tục. Chỉ được gọi trong Coroutine hoặc một suspend function khác.
+* **Dispatchers Nâng Cao:**
+   * `Dispatchers.Main`: Đẩy tác vụ xếp hàng chờ. Gây trễ 1 frame (flicker).
+   * `Dispatchers.Main.immediate`: Nếu đang ở Main Thread thì chạy đồng bộ ngay lập tức. Cực kỳ tối ưu cho Jetpack Compose.
+   * `Dispatchers.IO` (Mạng/DB) & `Dispatchers.Default` (Tính toán nặng).
 
-### ViewModel Lifecycle
-- Khi xoay màn hình (Configuration Change), Activity bị hủy nhưng ViewModel sống sót nhờ được lưu trong **`ViewModelStore`** được hệ thống "tạm giữ" và bàn giao lại cho Activity mới.
+### Builders & Concurrency (Đồng thời)
+* **`launch` vs `async`:** `launch` bắn rồi quên, lỗi văng ra ngoài. `async` dùng khi cần trả kết quả, lỗi được gói trong `Deferred` và chỉ nổ khi gọi `.await()`.
+* **`withContext`:** Chuyển luồng **Tuần tự (Sequential)**. Dùng để bọc các hàm gọi API/DB ở Repository, ép chạy luồng nền, giúp an toàn tuyệt đối cho Main Thread.
+* **Chạy song song:** Để tiết kiệm thời gian, bọc các lệnh `async` vào trong một `coroutineScope`.
+
+### Quản lý lỗi & Hủy bỏ (Cancellation)
+* **Cooperative Cancellation (Hủy hợp tác):** Lệnh `job.cancel()` chỉ bật cờ `isActive = false`. Với vòng lặp nặng, phải kiểm tra `while(isActive)` hoặc `yield()` để Coroutine chịu dừng, tránh Memory Leak.
+* **Chết chùm vs Độc lập:** * `coroutineScope` (Job): Tính hủy bỏ 2 chiều. Một API lỗi kéo theo cái đang chạy bị hủy ngang.
+   * `supervisorScope` (SupervisorJob): Lỗi 1 chiều. Con chết không làm sập cha và anh em. (Ví dụ: `viewModelScope` mặc định dùng SupervisorJob).
+* **CoroutineExceptionHandler (CEH):** Bắt lỗi không xác định (chỉ hoạt động với `launch` ở Root Coroutine).
+
+---
+
+## 5. LUỒNG DỮ LIỆU THỰC CHIẾN (KOTLIN FLOW) 🌊
+
+### Flow vs StateFlow vs SharedFlow
+* **Cold Flow:** Khởi động lại từ đầu với mỗi Collector mới.
+* **Hot Flow (StateFlow):** Nắm giữ trạng thái. Luôn giữ 1 giá trị mới nhất, BẮT BUỘC có giá trị khởi tạo. Dùng cho UI State (Danh sách, chữ, loading).
+* **Hot Flow (SharedFlow):** Bắn sự kiện 1 lần. KHÔNG lưu trạng thái cũ, KHÔNG cần giá trị khởi tạo. Dùng bắn Toast, Navigation. Tránh lỗi hiển thị lại thông báo (replay) vô lý khi xoay màn hình.
+
+### Vòng đời của StateFlow
+Sống dựa vào Scope mà nó được khởi tạo. Để an toàn, chuyển Cold Flow thành StateFlow bằng `.stateIn()`, kết hợp `SharingStarted.WhileSubscribed(5000)` để giữ cache 5s chống gọi lại mạng khi xoay thiết bị, tự động ngủ khi user ẩn app.
+
+### Flow Operators (Toán tử ăn điểm)
+* **`debounce(300ms)`:** Trì hoãn gõ phím, chống spam API.
+* **`flatMapLatest`:** Hủy request cũ ngay khi có request mới (chống Race Condition).
+* **`collectAsStateWithLifecycle()`:** Tự động ngừng collect khi app rơi vào Background để tiết kiệm pin/mạng.
+* **`conflate()`:** Xử lý **Backpressure**. Drop các giá trị cũ khi UI đang bận vẽ, chỉ lấy giá trị mới nhất (tốt cho biểu đồ tốc độ mạng).
+* **`combine` vs `zip`:** `combine` gộp ngay giá trị mới nhất của luồng này với luồng kia. `zip` bắt phải đứng chờ 1-1 gây mất data.
+* **Exception Transparency:** Dùng `flowOn(Dispatchers.IO)` đổi luồng Upstream. Lỗi bắt bằng `.catch { }` nằm dưới cùng, nhường logic xử lý cho `.onEach { }`.
+
+---
+
+## 6. NETWORKING & VPN DEEP DIVE 🌐
+
+* **TCP vs UDP:** TCP tin cậy, chậm, dùng bắt tay 3 bước. UDP tốc độ cao, không bắt tay, phù hợp stream/VPN.
+* **TLS & Diffie-Hellman (ECDH):** TLS kết hợp mã hóa bất đối xứng (trao đổi khóa bằng thuật toán toán học Diffie-Hellman mà không gửi chìa khóa qua mạng) và đối xứng (truyền dữ liệu bằng AES).
+* **WireGuard & DNS Leak:** WireGuard dùng **Cryptokey Routing** và chạy trên UDP không cần bắt tay. DNS Leak là lỗi rò rỉ truy vấn tên miền ra ngoài đường ống mã hóa.
+* **Tối ưu Doze Mode cho VPN:** Kotlin Coroutines ping ngầm sẽ bị OS kill. Giải pháp: Cấu hình `PersistentKeepalive` để tầng Native (C++/Go) tự ping bằng tài nguyên cực thấp.
+
+---
+
+## 7. LƯU TRỮ, BACKGROUND & FCM 💾
+
+* **Room vs SharedPreferences:** Room cho data phức tạp. SharedPrefs cho Key-Value. Room lưu file vật lý tại `/data/data/<package_name>/databases/` (Sandbox).
+* **SharedPrefs (`apply` vs `commit`):** Luôn dùng **`apply()`** (ghi bất đồng bộ) để chống ANR. Chỉ dùng `commit()` khi bắt buộc phải chờ kết quả ghi ổ cứng (và phải gọi trên luồng nền).
+* **FCM (Firebase Cloud Messaging):** * Bị đổi Token khi: Clear Data, Cài lại app. Cập nhật ở `onNewToken()`.
+   * App bị Kill: Hệ thống tự hiện Push. Phải lấy payload data bằng `intent.extras` ở `onCreate()`.
+* **Giữ kết nối ngầm (Background/Doze):** BẮT BUỘC dùng **Foreground Service** kèm Notification cứng. Android 14+ phải khai báo type `connectedDevice`.
+
+---
+
+## 8. PHẦN CỨNG (BLE - BLUETOOTH LOW ENERGY) 🔵
+
+* **Kiến trúc GATT:** * **Service:** Ngăn chứa nhóm chức năng.
+   * **Characteristic:** Nơi chứa data thực tế để Đọc/Ghi/Lắng nghe (Notify).
+* **Cạm bẫy cực hiểm:**
+   * **Callback Thread:** Mọi thứ trả về ở `BluetoothGattCallback` đều nằm ở luồng ngầm (Binder Thread), cập nhật UI trực tiếp sẽ gây Crash.
+   * **Sequential Write:** HĐH Android không có bộ xếp hàng (Queue). Gọi 2 lệnh Ghi liên tiếp mà chưa chờ xong lệnh 1 sẽ bị drop lệnh 2.
+   * **Android 13+:** Bắt buộc dùng cú pháp `writeCharacteristic` mới truyền trực tiếp mảng byte thay vì `characteristic.value`.
+
+---
+
+## 9. KOTLIN NÂNG CAO (UNDER THE HOOD) 🧙
+
+* **Type Erasure (`inline` + `reified`):** Dùng `reified T` để chống lại việc máy ảo Java xóa mất kiểu Generic lúc chạy. Giúp parse JSON sạch đẹp.
+* **Value Class (Zero-cost Abstraction):** Dùng `@JvmInline value class`. An toàn kiểu dữ liệu lúc code, nhưng khi build ra mã máy bị xóa lớp vỏ, tối ưu hoàn toàn trên RAM.
+* **Generic Covariance (`<out T>`):** Xây dựng "Phễu API" (`Result<out T>`) dùng chung để loại bỏ `try-catch` lặp lại.
+
+---
+
+## 10. THUẬT TOÁN & BUILD TOOLS 🛠️
+
+* **Thuật toán cốt lõi:**
+   * **Tìm kiếm:** Trie (Cây tiền tố, Autocomplete), A* (Đường đi ngắn nhất có heuristic), Hashing (Bảng băm $O(1)$).
+   * **Sắp xếp:** Quick Sort (Trung bình $O(n \log n)$), Tim Sort (Lai tạp siêu tối ưu, là mặc định của Java/Kotlin).
+* **ProGuard / R8:**
+   * Cơ chế: Shrinking (Xóa code thừa), Obfuscation (Đổi tên a,b,c chống dịch ngược), Optimization (Tối ưu bytecode).
+   * **Lưu ý:** Gắn `@Keep` cho Data Models để không bị xóa mất biến khi dùng Gson/Moshi parse dữ liệu mạng.
