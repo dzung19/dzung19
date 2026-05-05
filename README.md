@@ -71,7 +71,9 @@
 * **Chết chùm vs Độc lập:** * `coroutineScope` (Job): Tính hủy bỏ 2 chiều. Một API lỗi kéo theo cái đang chạy bị hủy ngang.
    * `supervisorScope` (SupervisorJob): Lỗi 1 chiều. Con chết không làm sập cha và anh em. (Ví dụ: `viewModelScope` mặc định dùng SupervisorJob).
 * **CoroutineExceptionHandler (CEH):** Bắt lỗi không xác định (chỉ hoạt động với `launch` ở Root Coroutine).
-
+### Cơ chế của lệnh `join()`: Coroutines vs Threads
+*   **Java Thread `join()` (Blocking):** Chặn đứng (Block) luồng hiện tại. Luồng phải đứng im chờ đợi đến khi thread kia làm xong, không thể làm việc khác.
+*   **Coroutine `join()` (Suspending):** Dùng cơ chế "Ve sầu thoát xác". Nó tạm cất trạng thái hiện tại (Suspend) và **giải phóng Thread**. Thread lập tức được rảnh tay để chạy các Coroutine khác. Khi tác vụ xong, Coroutine được đánh thức (Resume) và chạy tiếp.
 ---
 
 ## 5. LUỒNG DỮ LIỆU THỰC CHIẾN (KOTLIN FLOW) 🌊
@@ -83,6 +85,15 @@
 
 ### Vòng đời của StateFlow
 Sống dựa vào Scope mà nó được khởi tạo. Để an toàn, chuyển Cold Flow thành StateFlow bằng `.stateIn()`, kết hợp `SharingStarted.WhileSubscribed(5000)` để giữ cache 5s chống gọi lại mạng khi xoay thiết bị, tự động ngủ khi user ẩn app.
+
+### `SharedFlow` & `StateFlow`
+`StateFlow` thực chất là một `SharedFlow` được tối ưu hóa. Công thức chế tạo:
+**`StateFlow` = `SharedFlow(replay=1, drop_oldest)` + Bắt buộc có Initial Value + Tự động `distinctUntilChanged()` (chống trùng lặp) + Thuộc tính `.value`.**
+
+**Các tham số kiểm soát Buffer của `SharedFlow`:**
+1.  `replay`: Số lượng dữ liệu cũ lưu lại để phát ngay cho Collector **mới tham gia**.
+2.  `extraBufferCapacity`: Số "ghế chờ" dự phòng để lưu dữ liệu khi Collector đang bận xử lý không kịp. Giúp Emitter không bị block. Tổng bộ đệm = `replay + extraBufferCapacity`.
+3.  `onBufferOverflow`: Chiến lược xử lý khi bộ đệm đầy (`SUSPEND` - đứng chờ, `DROP_OLDEST` - xóa cái cũ nhất, `DROP_LATEST` - bỏ cái mới).
 
 ### Flow Operators (Toán tử ăn điểm)
 * **`debounce(300ms)`:** Trì hoãn gõ phím, chống spam API.
@@ -130,9 +141,38 @@ Sống dựa vào Scope mà nó được khởi tạo. Để an toàn, chuyển 
 * **Value Class (Zero-cost Abstraction):** Dùng `@JvmInline value class`. An toàn kiểu dữ liệu lúc code, nhưng khi build ra mã máy bị xóa lớp vỏ, tối ưu hoàn toàn trên RAM.
 * **Generic Covariance (`<out T>`):** Xây dựng "Phễu API" (`Result<out T>`) dùng chung để loại bỏ `try-catch` lặp lại.
 
+## 10. ANDROID SYSTEM APP & AOSP CORE
+
+### 1. Phân loại System App
+*   **`/system/app/` (Standard System App):** Ứng dụng hệ thống thường. Không gỡ cài đặt được, quyền hạn ngang app bình thường. Không cần file XML Whitelist.
+*   **`/system/priv-app/` (Privileged System App):** Ứng dụng đặc quyền (VD: Danh bạ, Tin nhắn gốc). Có quyền can thiệp phần cứng, hệ thống. **Bắt buộc** phải có file XML Whitelist cấp quyền đặt ở `/etc/permissions/` nếu không sẽ bị bootloop (treo logo).
+
+### 2. Cấu hình `Android.bp` để build System App
+**Cờ (Flags) quan trọng:**
+*   `certificate: "platform"`: Ký bằng chìa khóa gốc của hệ thống.
+*   `privileged: true`: Đẩy app vào `priv-app`. Nếu không có, mặc định vào `app`.
+*   `platform_apis: true`: Cho phép ứng dụng dùng các API `@hide` (ẩn) của Framework.
+*   `required: ["tên_module_xml"]`: Dùng để đính kèm file XML Whitelist (nếu là priv-app).
+
+### 3. Bài toán bảo mật: Lấy số IMEI
+*   **Dưới Android 10:** Chỉ cần xin quyền `READ_PHONE_STATE` và gọi `TelephonyManager`.
+*   **Từ Android 10+:** Google cấm app thường lấy IMEI (văng `SecurityException`).
+*   **Cách lách luật (Bypass):** Chỉ lấy được khi app là Privileged System App, Device Owner (MDM), hoặc được user set làm App gọi điện mặc định (Default Dialer).
+*   **Giải pháp thay thế cho App thường:** Dùng `ANDROID_ID`, Firebase Installation ID, hoặc tự sinh UUID.
+
+### 4. Bí kíp Phỏng vấn AOSP Framework
+Nhà tuyển dụng sẽ xoáy sâu vào cách HĐH quản lý ứng dụng:
+1.  **Boot Process & Zygote:** Tiến trình `Zygote` dùng cơ chế `fork()` để nhân bản process mới cho App, giúp share bộ nhớ và khởi động nhanh.
+2.  **Binder IPC:** Cơ chế giao tiếp liên tiến trình cốt lõi. Ưu việt nhờ cơ chế 1-copy process (truyền data qua Memory Mapping `mmap`). Hiểu AIDL, Proxy (Client) và Stub (Server).
+3.  **System Services (Bộ 3 quyền lực):**
+    *   *AMS (Activity Manager Service):* Quản lý Lifecycle, cấp phát RAM, OOM Killer.
+    *   *WMS (Window Manager Service):* Quản lý tọa độ, Z-index, WindowToken.
+    *   *PMS (Package Manager Service):* Quản lý cài đặt APK, cấp quyền Permissions.
+4.  **Cơ chế Render UI:** Choreographer, VSYNC, luồng Measure -> Layout -> Draw.
+
 ---
 
-## 10. THUẬT TOÁN & BUILD TOOLS 🛠️
+## 11. THUẬT TOÁN & BUILD TOOLS 🛠️
 
 * **Thuật toán cốt lõi:**
    * **Tìm kiếm:** Trie (Cây tiền tố, Autocomplete), A* (Đường đi ngắn nhất có heuristic), Hashing (Bảng băm $O(1)$).
